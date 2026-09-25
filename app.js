@@ -75,11 +75,94 @@ function formatSignedKRW(n) {
   return formatKRW(rounded) + "원";
 }
 
+function habitMonthly(h) {
+  return (Number(h.price) || 0) * (Number(h.freq) || 0);
+}
+
 function habitSpendTotal() {
-  return state.habits.reduce(
-    (sum, h) => sum + (Number(h.price) || 0) * (Number(h.freq) || 0),
-    0
-  );
+  return state.habits.reduce((sum, h) => sum + habitMonthly(h), 0);
+}
+
+/** 대략적인 소비재 기준가 (원) — 연환산 비유용 */
+const PRODUCT_LADDER = [
+  { name: "편의점 삼각김밥", price: 1_500 },
+  { name: "영화 티켓", price: 15_000 },
+  { name: "제주 왕복", price: 200_000 },
+  { name: "에어팟", price: 300_000 },
+  { name: "아이패드", price: 500_000 },
+  { name: "노트북", price: 1_000_000 },
+  { name: "아이폰", price: 1_200_000 },
+];
+
+function habitsWithSpend() {
+  return state.habits
+    .map((h) => ({ habit: h, monthly: habitMonthly(h) }))
+    .filter((x) => x.monthly > 0);
+}
+
+function topHabitBySpend() {
+  const withSpend = habitsWithSpend();
+  if (!withSpend.length) return null;
+  return withSpend.reduce((a, b) => (b.monthly > a.monthly ? b : a));
+}
+
+function rankedHabitsBySpend() {
+  return habitsWithSpend().sort((a, b) => b.monthly - a.monthly);
+}
+
+function shortHabitLabel(name) {
+  const n = String(name).trim();
+  const first = n.split(/\s+/)[0];
+  if (first.length <= 12) return first;
+  return first.slice(0, 11) + "…";
+}
+
+function formatYearlyKRW(yearly) {
+  const y = Math.round(yearly);
+  if (y >= 10_000) {
+    const man = y / 10_000;
+    const rounded =
+      man >= 100 ? Math.round(man) : Math.round(man * 10) / 10;
+    const text = Number.isInteger(rounded)
+      ? String(rounded)
+      : rounded.toFixed(1).replace(/\.0$/, "");
+    return text + "만 원";
+  }
+  return formatKRW(y) + "원";
+}
+
+/** 연간 금액 → 가장 와닿는 소비재 비유 (대략) */
+function productEquivalent(yearly) {
+  const y = Math.round(yearly);
+  if (y <= 0) return null;
+
+  for (let i = PRODUCT_LADDER.length - 1; i >= 0; i--) {
+    const p = PRODUCT_LADDER[i];
+    if (y >= p.price * 0.75) {
+      const count = Math.floor(y / p.price);
+      if (count >= 2) return `${p.name} ${count}개`;
+      if (y >= p.price) return p.name;
+      return `거의 ${p.name}`;
+    }
+  }
+
+  const small = PRODUCT_LADDER[0];
+  const n = Math.max(1, Math.floor(y / small.price));
+  if (n >= 2) return `${small.name} ${n}개`;
+  return small.name;
+}
+
+function formatProductEquivPhrase(yearly) {
+  const eq = productEquivalent(yearly);
+  if (!eq) return "";
+  if (eq.startsWith("거의 ")) return `= ${eq} 살 돈`;
+  if (eq.includes("개")) return `= ${eq} 살 돈`;
+  return `= ${eq} 살 돈`;
+}
+
+function habitPctOfTakeHome(monthly, takeHome) {
+  if (!takeHome || takeHome <= 0) return 0;
+  return (monthly / takeHome) * 100;
 }
 
 function renderHabits() {
@@ -156,6 +239,9 @@ function updateUI() {
     hint.textContent = "이번 달 여유분 추정이에요.";
   }
 
+  renderAnnualShock();
+  renderRankCard(est.takeHome);
+
   // Refresh row subtotals without full re-render if list exists
   document.querySelectorAll(".habit-row").forEach((row) => {
     const i = Number(row.dataset.index);
@@ -165,6 +251,90 @@ function updateUI() {
     const el = row.querySelector(".habit-subtotal");
     if (el) el.textContent = `월 ${formatKRW(sub)}원`;
   });
+}
+
+function renderAnnualShock() {
+  const section = document.getElementById("annual-shock-section");
+  const top = topHabitBySpend();
+  if (!top) {
+    section.classList.add("hidden");
+    return;
+  }
+
+  const yearly = top.monthly * 12;
+  const label = shortHabitLabel(top.habit.name);
+  document.getElementById("shock-line-main").innerHTML =
+    `「${escapeHtml(label)}」만 1년에 <strong>${formatYearlyKRW(yearly)}</strong>`;
+  const equivBody = formatProductEquivPhrase(yearly).replace(/^=\s*/, "");
+  document.getElementById("shock-line-equiv").innerHTML =
+    `= <strong>${escapeHtml(equivBody)}</strong>`;
+  section.classList.remove("hidden");
+}
+
+function renderRankCard(takeHome) {
+  const list = document.getElementById("rank-list");
+  const empty = document.getElementById("rank-empty");
+  const ranked = rankedHabitsBySpend();
+
+  list.innerHTML = "";
+  if (!ranked.length) {
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
+
+  const maxMonthly = ranked[0].monthly;
+
+  ranked.forEach((item, index) => {
+    const rank = index + 1;
+    const pct = habitPctOfTakeHome(item.monthly, takeHome);
+    const barPct = maxMonthly > 0 ? (item.monthly / maxMonthly) * 100 : 0;
+    const li = document.createElement("li");
+    li.className = "rank-row" + (rank === 1 ? " rank-top" : "");
+
+    li.innerHTML = `
+      <span class="rank-num" aria-hidden="true">${rank}</span>
+      <span class="rank-name">${escapeHtml(item.habit.name)}</span>
+      <span class="rank-pct">${pct.toFixed(1)}%</span>
+      <span class="rank-meta">월 ${formatKRW(item.monthly)}원</span>
+      <div class="rank-bar-wrap" aria-hidden="true">
+        <div class="rank-bar" style="width: ${barPct.toFixed(1)}%"></div>
+      </div>
+    `;
+    list.appendChild(li);
+  });
+}
+
+function buildShareSummary(est, spend, leftover) {
+  const lines = [
+    "월급잔액 요약",
+    `잔액 ${formatSignedKRW(leftover)} · 실수령 ${formatKRW(est.takeHome)}원 · 습관 ${formatKRW(spend)}원`,
+  ];
+
+  const top = topHabitBySpend();
+  if (top) {
+    const yearly = top.monthly * 12;
+    const label = shortHabitLabel(top.habit.name);
+    const equiv = formatProductEquivPhrase(yearly);
+    lines.push(
+      `「${label}」1년 ${formatYearlyKRW(yearly)} ${equiv.replace(/^=\s*/, "")}`
+    );
+  }
+
+  const ranked = rankedHabitsBySpend().slice(0, 3);
+  if (ranked.length) {
+    const rankLine = ranked
+      .map((item, i) => {
+        const pct = habitPctOfTakeHome(item.monthly, est.takeHome);
+        const name = shortHabitLabel(item.habit.name);
+        return `${i + 1}.${name} ${pct.toFixed(1)}%`;
+      })
+      .join(" · ");
+    lines.push(`순위 ${rankLine}`);
+  }
+
+  lines.push("(추정 · 세무 자문 아님)");
+  return lines.join("\n");
 }
 
 function fullRender() {
@@ -283,11 +453,7 @@ function bindEvents() {
     const est = estimateTakeHome(state.salary);
     const spend = habitSpendTotal();
     const leftover = est.takeHome - spend;
-    const text = [
-      "월급잔액 요약",
-      `세전 ${formatKRW(est.gross)}원 / 실수령 ${formatKRW(est.takeHome)}원 / 습관 ${formatKRW(spend)}원 / 잔액 ${formatSignedKRW(leftover)}`,
-      "(추정 · 세무 자문 아님)",
-    ].join("\n");
+    const text = buildShareSummary(est, spend, leftover);
 
     const btn = document.getElementById("btn-share");
     try {
