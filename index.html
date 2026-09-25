@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="세전 월급으로 실수령을 추정하고, 습관 지출을 빼면 남는 여유분을 바로 보여줘요." />
+    <meta name="theme-color" content="#f7f6f3" />
+    <title>월급잔액 — 습관 쓰고 남는 돈</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <h1>월급잔액</h1>
+        <p>습관 쓰고 이번 달 얼마 남아요?</p>
+      </header>
+
+      <section class="card" aria-labelledby="salary-label">
+        <div class="card-label" id="salary-label">세전 월급</div>
+        <div class="salary-input-wrap">
+          <input
+            id="salary-input"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            aria-label="세전 월급"
+            value="3,500,000"
+          />
+          <span class="unit">원</span>
+        </div>
+        <div class="takehome-row">
+          <span class="label">실수령 (추정)</span>
+          <span class="value" id="takehome-value">—</span>
+        </div>
+        <p class="disclaimer">
+          세무·보험 자문이 아니에요. 대략적인 추정값이에요.
+        </p>
+        <details class="calc-basis">
+          <summary>계산 기준 보기</summary>
+          <div class="basis-body">
+            <p><strong>4대보험</strong> 근로자 부담 ≈ 세전 × <code>9.4%</code></p>
+            <p style="margin-top: 0.35rem">
+              국민연금 4.5% + 건강보험 ≈3.545% + 장기요양(건강의 ≈12.81%) + 고용 0.9%
+            </p>
+            <p style="margin-top: 0.55rem"><strong>소득세·지방세 (추정 실효세율)</strong></p>
+            <p style="margin-top: 0.25rem">
+              월 세전 ~200만 0.5% · ~300만 2% · ~400만 3.5% · ~500만 5% ·
+              ~700만 7.5% · ~1000만 10% · 그 이상 13%
+            </p>
+            <p style="margin-top: 0.55rem">
+              실수령 ≈ 세전 − 4대보험 − 소득세추정<br />
+              근로소득공제·부양가족·비과세는 반영하지 않았어요.
+            </p>
+          </div>
+        </details>
+      </section>
+
+      <section class="card leftover-card" aria-live="polite">
+        <div class="card-label">이번 달 잔액</div>
+        <div class="leftover-num" id="leftover-num">—</div>
+        <p class="leftover-sub" id="leftover-hint">실수령에서 습관 지출을 뺀 값이에요.</p>
+        <p class="habit-spend">
+          습관 합계 <strong id="habit-spend-value">—</strong>
+        </p>
+      </section>
+
+      <section class="card" aria-labelledby="habits-title">
+        <div class="habits-header">
+          <h2 id="habits-title">습관 목록</h2>
+        </div>
+        <ul class="habit-list" id="habit-list"></ul>
+
+        <button type="button" class="btn btn-ghost toggle-add" id="btn-toggle-add">
+          + 습관 추가
+        </button>
+
+        <div class="add-form hidden" id="add-form">
+          <div class="add-form-row">
+            <input
+              type="text"
+              id="new-name"
+              placeholder="이름 (예: 담배)"
+              maxlength="30"
+              autocomplete="off"
+            />
+            <input
+              type="number"
+              id="new-price"
+              placeholder="단가"
+              min="0"
+              step="100"
+              inputmode="numeric"
+            />
+          </div>
+          <div class="add-form-row">
+            <button type="button" class="btn btn-ghost" id="btn-cancel-add" style="flex: 1">
+              취소
+            </button>
+            <button type="button" class="btn btn-primary" id="btn-add-habit" style="flex: 1">
+              추가
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <button type="button" class="btn btn-share" id="btn-share">
+        요약 복사하기
+      </button>
+
+      <footer>
+        월세·고정비는 v1에 없어요 · 재미용 여유분 계산기
+      </footer>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
